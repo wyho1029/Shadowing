@@ -59,27 +59,38 @@ function loadSentence() {
   $("play-mine").disabled = true;
 }
 
+// 單一個 timeupdate listener，永遠讀「當前句」嘅 end（唔好每次撳都加新 listener）
+function bindSegmentStop() {
+  const a = $("orig-audio");
+  if (a._stopBound) return;
+  a.addEventListener("timeupdate", () => {
+    const cur = material && material.sentences[idx];
+    if (!cur) return;
+    if (a.currentTime >= cur.end) {
+      if ($("loop").checked) a.currentTime = cur.start;
+      else a.pause();
+    }
+  });
+  a._stopBound = true;
+}
+
 $("play-orig").onclick = () => {
   const s = material.sentences[idx];
   const a = $("orig-audio");
-  const stopAt = () => {
-    if (a.currentTime >= s.end) {
-      if ($("loop").checked) { a.currentTime = s.start; }
-      else { a.pause(); a.removeEventListener("timeupdate", stopAt); }
-    }
-  };
-  const start = () => {
-    a.playbackRate = $("slow").checked ? 0.75 : 1.0;
-    a.currentTime = s.start;   // 一定要 metadata 載好先 seek，否則會被夾到 0
-    a.addEventListener("timeupdate", stopAt);
-    a.play();
-  };
-  // readyState < 1 代表 metadata 未載好，seek 會失效 → 等 loadedmetadata 先播
-  if (a.readyState < 1) {
-    a.addEventListener("loadedmetadata", start, { once: true });
-    a.load();
-  } else {
-    start();
+  a.playbackRate = $("slow").checked ? 0.75 : 1.0;
+  bindSegmentStop();
+
+  // 一定要喺用戶手勢同步 call play()，否則會被 autoplay 政策擋（靜靜冇聲）。
+  // seek：metadata 載好就即刻 seek，未好就等 loadedmetadata（避免被夾到 0）。
+  const seekToStart = () => { try { a.currentTime = s.start; } catch (_) {} };
+  if (a.readyState >= 1) seekToStart();
+  else a.addEventListener("loadedmetadata", seekToStart, { once: true });
+
+  const p = a.play();
+  if (p && p.catch) {
+    p.catch((err) => {
+      $("status").textContent = "▶ 播放被瀏覽器擋住，請再撳一次：" + err.message;
+    });
   }
 };
 
