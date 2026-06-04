@@ -72,10 +72,20 @@ async def api_attempt(sentence_id: int = Form(...), audio: UploadFile = File(...
             "score": result["score"], "status": status}
 
 
+# 唔同音檔副檔名對應嘅 MIME，確保瀏覽器 <audio> 識播（唔好變 octet-stream）
+_AUDIO_MIME = {
+    ".m4a": "audio/mp4", ".mp4": "audio/mp4", ".aac": "audio/aac",
+    ".webm": "audio/webm", ".weba": "audio/webm",
+    ".opus": "audio/ogg", ".ogg": "audio/ogg",
+    ".mp3": "audio/mpeg", ".wav": "audio/wav",
+}
+
+
 @app.get("/api/audio/{youtube_id}")
 def api_audio(youtube_id: str):
     for f in AUDIO_DIR.glob(f"{youtube_id}.*"):
-        return FileResponse(str(f))
+        media_type = _AUDIO_MIME.get(f.suffix.lower())
+        return FileResponse(str(f), media_type=media_type)
     raise HTTPException(404, "audio not found")
 
 

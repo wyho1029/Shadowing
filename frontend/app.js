@@ -62,16 +62,25 @@ function loadSentence() {
 $("play-orig").onclick = () => {
   const s = material.sentences[idx];
   const a = $("orig-audio");
-  a.playbackRate = $("slow").checked ? 0.75 : 1.0;
-  a.currentTime = s.start;
-  a.play();
   const stopAt = () => {
     if (a.currentTime >= s.end) {
       if ($("loop").checked) { a.currentTime = s.start; }
       else { a.pause(); a.removeEventListener("timeupdate", stopAt); }
     }
   };
-  a.addEventListener("timeupdate", stopAt);
+  const start = () => {
+    a.playbackRate = $("slow").checked ? 0.75 : 1.0;
+    a.currentTime = s.start;   // 一定要 metadata 載好先 seek，否則會被夾到 0
+    a.addEventListener("timeupdate", stopAt);
+    a.play();
+  };
+  // readyState < 1 代表 metadata 未載好，seek 會失效 → 等 loadedmetadata 先播
+  if (a.readyState < 1) {
+    a.addEventListener("loadedmetadata", start, { once: true });
+    a.load();
+  } else {
+    start();
+  }
 };
 
 $("record").onclick = async () => {
