@@ -1,0 +1,22 @@
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem;
+       max-width: 640px; margin-inline: auto; background: #faf7f2; color: #222; }
+header h1 { font-size: 1.4rem; }
+.shows { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }
+.shows button { padding: .5rem .8rem; border: 1px solid #ccc; border-radius: 8px;
+                background: #fff; cursor: pointer; }
+.shows button.selected { background: #2d6cdf; color: #fff; border-color: #2d6cdf; }
+button { font-size: 1rem; padding: .6rem 1rem; border-radius: 8px;
+         border: 1px solid #888; background: #fff; cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.controls { display: flex; gap: .6rem; align-items: center; margin: .8rem 0;
+            flex-wrap: wrap; }
+.ref { font-size: 1.3rem; line-height: 1.6; background: #fff; padding: 1rem;
+       border-radius: 10px; border: 1px solid #eee; }
+.status { color: #666; min-height: 1.2em; }
+.tokens span { padding: 0 .15em; border-radius: 4px; }
+.tok-ok { color: #137333; }
+.tok-wrong { color: #c5221f; text-decoration: underline; }
+.tok-missing { color: #c5221f; background: #fde0df; }
+.tok-extra { color: #b06000; font-style: italic; }
+#record.recording { background: #c5221f; color: #fff; }
