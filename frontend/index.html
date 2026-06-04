@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shadowing</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header><h1>Shadowing</h1></header>
+
+  <section id="show-picker">
+    <h2>揀一套劇</h2>
+    <div id="shows" class="shows"></div>
+    <button id="find-btn" disabled>搵片開始練</button>
+    <p id="status" class="status"></p>
+  </section>
+
+  <section id="practice" hidden>
+    <p id="material-title" class="title"></p>
+    <p id="progress" class="progress"></p>
+
+    <blockquote id="ref-text" class="ref"></blockquote>
+
+    <div class="controls">
+      <button id="play-orig">▶ 播原句</button>
+      <label><input type="checkbox" id="slow" /> 0.75x 慢放</label>
+      <label><input type="checkbox" id="loop" /> Loop</label>
+    </div>
+
+    <div class="controls">
+      <button id="record">● 錄跟讀</button>
+      <button id="play-mine" disabled>▶ 聽返自己</button>
+    </div>
+
+    <div id="result" class="result" hidden>
+      <p class="score">分數：<span id="score"></span></p>
+      <p id="tokens" class="tokens"></p>
+    </div>
+
+    <div class="controls">
+      <button id="mark-pass">✓ 過咗，下一句</button>
+      <button id="mark-retry">↻ 再練</button>
+    </div>
+  </section>
+
+  <audio id="orig-audio"></audio>
+  <script src="/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js");
+    }
+  </script>
+</body>
+</html>
