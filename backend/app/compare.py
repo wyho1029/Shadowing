@@ -5,7 +5,7 @@ from difflib import SequenceMatcher
 def normalize(text: str) -> list[str]:
     """轉細階、淨低字母數字同空格、split 成 token list。"""
     text = text.lower()
-    text = re.sub(r"[^\w\s']", " ", text)   # 去標點（保留 apostrophe 先）
+    text = re.sub(r"[^\w\s']", " ", text)   # 去標點；連字號等變空格（well-known→兩個 token），apostrophe 留到下一行先處理
     text = text.replace("'", "")            # 縮寫去 apostrophe：im / dont
     return text.split()
 
