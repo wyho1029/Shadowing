@@ -1,39 +1,36 @@
 from app import youtube
 
 
-def test_pick_first_with_english_subs():
+def test_pick_first_in_duration_range():
+    # flat 搜尋結果只有 id/title/duration（冇 subtitles 欄位）；揀第一個長度合理嘅
     entries = [
-        {"id": "no_subs", "duration": 120, "subtitles": {}, "automatic_captions": {}},
-        {"id": "good", "duration": 120, "subtitles": {"en": [{}]},
-         "automatic_captions": {}},
+        {"id": "first", "duration": 120, "title": "a"},
+        {"id": "second", "duration": 200, "title": "b"},
     ]
-    chosen = youtube.pick_candidate(entries)
-    assert chosen["id"] == "good"
+    assert youtube.pick_candidate(entries)["id"] == "first"
 
 
 def test_pick_rejects_too_short_or_too_long():
     entries = [
-        {"id": "too_short", "duration": 20, "subtitles": {"en": [{}]},
-         "automatic_captions": {}},
-        {"id": "too_long", "duration": 1200, "subtitles": {"en": [{}]},
-         "automatic_captions": {}},
-        {"id": "ok", "duration": 180, "subtitles": {"en": [{}]},
-         "automatic_captions": {}},
+        {"id": "too_short", "duration": 20, "title": "a"},
+        {"id": "too_long", "duration": 1200, "title": "b"},
+        {"id": "ok", "duration": 180, "title": "c"},
     ]
     assert youtube.pick_candidate(entries)["id"] == "ok"
 
 
-def test_pick_accepts_auto_captions_as_fallback():
+def test_pick_handles_missing_duration():
+    # flat entry 偶爾冇 duration（live / 私人片）→ 當唔合格 skip
     entries = [
-        {"id": "auto", "duration": 120, "subtitles": {},
-         "automatic_captions": {"en": [{}]}},
+        {"id": "no_dur", "title": "a"},
+        {"id": "ok", "duration": 90, "title": "b"},
     ]
-    assert youtube.pick_candidate(entries)["id"] == "auto"
+    assert youtube.pick_candidate(entries)["id"] == "ok"
 
 
 def test_pick_returns_none_when_nothing_suitable():
     entries = [
-        {"id": "x", "duration": 5, "subtitles": {}, "automatic_captions": {}},
+        {"id": "x", "duration": 5, "title": "a"},
     ]
     assert youtube.pick_candidate(entries) is None
 

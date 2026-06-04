@@ -11,6 +11,14 @@
 
 ## 安裝
 
+**先決條件：要有 `ffmpeg`**（yt-dlp 抽音、faster-whisper 解碼都要佢）。Windows 可用：
+
+```powershell
+winget install Gyan.FFmpeg
+```
+
+裝完開個新 terminal 確認 `ffmpeg -version` 行到。然後：
+
 ```powershell
 cd backend
 python -m venv .venv
@@ -30,9 +38,20 @@ cd backend
 ## 點用
 
 1. 揀一套劇
-2. 撳「搵片開始練」（**第一次會載 Whisper model，耐少少**）
+2. 撳「搵片開始練」—— 後端會自動搵片、下載、Whisper 轉文字切句。
+   **要等一陣：6 分鐘片喺普通 CPU 用 `small` model 大約 ~3 分鐘**（第一次仲要載 model）。
+   要快啲可以喺 `app/config.py` 將 `WHISPER_MODEL` 改細（如 `"base"`）。
 3. 逐句：▶ 播原句（可慢放/loop）→ ● 錄跟讀 → 睇綠/紅逐字對比 → ▶ 聽返自己
 4. 撳「過咗，下一句」或「再練」
+
+### 揀片邏輯（實測筆記）
+
+- 用 yt-dlp **flat 搜尋**攞候選片，淨係按長度（30 秒–10 分鐘）揀第一條；**唔靠 YouTube 字幕**
+  （transcript 一律由 Whisper 由音檔生成）。
+- 升級 yt-dlp 到最新好重要：舊版會撞 YouTube 的 nsig / 反機械人錯誤。
+- 如果連搜尋都被 YouTube 擋（"Sign in to confirm you're not a bot"），可以喺 `app/config.py`
+  將 `YTDLP_COOKIES_FROM_BROWSER` 設成 `"chrome"`／`"firefox"` 借用瀏覽器登入 cookies
+  （用 Chrome 嗰陣要**先完全閂咗 Chrome**，cookie DB 先解到鎖）。
 
 ## 行 test
 
