@@ -8,6 +8,8 @@ from app import main
 def get_client(tmp_path, monkeypatch):
     from app.db import Database
     monkeypatch.setattr(main, "db", Database(tmp_path / "t.sqlite3"))
+    # 預設停用 Bilibili（避免真網絡）；要測 Bilibili 嘅 test 自己再 override
+    monkeypatch.setattr(main.bilibili, "find_clip", lambda url: None)
     return TestClient(main.app)
 
 
@@ -40,6 +42,36 @@ def test_create_material_no_clip_found(tmp_path, monkeypatch):
     monkeypatch.setattr(main.youtube, "find_clip", lambda q: None)
     r = client.post("/api/materials", params={"show_id": "bojack"})
     assert r.status_code == 404
+
+
+def test_bilibili_preferred_over_youtube(tmp_path, monkeypatch):
+    client = get_client(tmp_path, monkeypatch)
+    # Bilibili 有片 → 應該用 Bilibili，唔好掂 YouTube
+    monkeypatch.setattr(main.bilibili, "find_clip", lambda url: {
+        "youtube_id": "BV_p1", "title": "bili ep", "audio_path": "data/audio/BV_p1.m4a"})
+
+    def _youtube_should_not_be_called(q):
+        raise AssertionError("YouTube should not be called when Bilibili succeeds")
+    monkeypatch.setattr(main.youtube, "find_clip", _youtube_should_not_be_called)
+    monkeypatch.setattr(main.transcribe, "transcribe_segments", lambda p: [
+        {"text": "Hello.", "start": 0.0, "end": 1.0}])
+
+    r = client.post("/api/materials", params={"show_id": "bojack"})
+    assert r.status_code == 200
+    assert r.json()["youtube_id"] == "BV_p1"
+
+
+def test_falls_back_to_youtube_when_bilibili_none(tmp_path, monkeypatch):
+    client = get_client(tmp_path, monkeypatch)
+    # Bilibili 抽唔到（get_client 已設 None）→ 用返 YouTube
+    monkeypatch.setattr(main.youtube, "find_clip", lambda q: {
+        "youtube_id": "yt1", "title": "yt clip", "audio_path": "data/audio/yt1.m4a"})
+    monkeypatch.setattr(main.transcribe, "transcribe_segments", lambda p: [
+        {"text": "Hello.", "start": 0.0, "end": 1.0}])
+
+    r = client.post("/api/materials", params={"show_id": "bojack"})
+    assert r.status_code == 200
+    assert r.json()["youtube_id"] == "yt1"
 
 
 def test_submit_attempt_returns_tokens(tmp_path, monkeypatch):

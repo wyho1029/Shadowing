@@ -11,3 +11,8 @@ backend/data/
 
 # whisper model cache
 *.bin
+
+# cookies (含登入憑證，唔好上 git)
+cookies.txt
+*cookies*.txt
+*_cookies.txt

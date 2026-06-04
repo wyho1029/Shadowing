@@ -6,7 +6,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import compare, segmenter, shows, transcribe, youtube
+from app import bilibili, compare, segmenter, shows, transcribe, youtube
 from app.config import AUDIO_DIR, DB_PATH
 from app.db import Database
 
@@ -29,7 +29,14 @@ def api_create_material(show_id: str):
     except KeyError:
         raise HTTPException(404, f"unknown show: {show_id}")
 
-    clip = youtube.find_clip(query)
+    # 有綁 Bilibili 合集就優先用（curated shadowing 系列、要 cookies）；
+    # 抽唔到（冇 cookies / 412）就 fallback 去 YouTube 搜尋。
+    clip = None
+    collection = shows.get_bilibili_collection(show_id)
+    if collection:
+        clip = bilibili.find_clip(collection)
+    if clip is None:
+        clip = youtube.find_clip(query)
     if clip is None:
         raise HTTPException(404, "呢套劇暫時搵唔到啱嘅片，試下另一套")
 

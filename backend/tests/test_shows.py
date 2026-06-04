@@ -1,4 +1,9 @@
-from app.shows import SHOWS, get_search_query, list_shows
+from app.shows import (
+    SHOWS,
+    get_bilibili_collection,
+    get_search_query,
+    list_shows,
+)
 
 
 def test_has_expected_shows():
@@ -20,3 +25,12 @@ def test_get_search_query_unknown_raises():
     import pytest
     with pytest.raises(KeyError):
         get_search_query("not_a_show")
+
+
+def test_bojack_has_bilibili_collection():
+    url = get_bilibili_collection("bojack")
+    assert url and "bilibili.com" in url
+
+
+def test_show_without_collection_returns_none():
+    assert get_bilibili_collection("simpsons") is None

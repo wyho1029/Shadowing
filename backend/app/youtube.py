@@ -2,20 +2,27 @@ from pathlib import Path
 
 import yt_dlp
 
-from app.config import AUDIO_DIR, YTDLP_COOKIES_FROM_BROWSER
+from app.config import (
+    AUDIO_DIR,
+    YTDLP_COOKIE_FILE,
+    YTDLP_COOKIES_FROM_BROWSER,
+)
 
 MIN_DURATION = 30      # 秒
 MAX_DURATION = 600     # 秒（10 分鐘）
 
 
 def _base_opts() -> dict:
-    """所有 yt-dlp 呼叫共用嘅 options：靜音、忽略個別片錯誤、按需借用瀏覽器 cookies。"""
+    """所有 yt-dlp 呼叫共用嘅 options：靜音、忽略個別片錯誤、按需用 cookies。"""
     opts = {
         "quiet": True,
         "no_warnings": True,
         "ignoreerrors": True,   # 個別片抽唔到就 skip，唔好成個 crash
     }
-    if YTDLP_COOKIES_FROM_BROWSER:
+    # cookie 檔優先（最穩）；冇先至試瀏覽器 cookies
+    if YTDLP_COOKIE_FILE and Path(YTDLP_COOKIE_FILE).exists():
+        opts["cookiefile"] = str(YTDLP_COOKIE_FILE)
+    elif YTDLP_COOKIES_FROM_BROWSER:
         opts["cookiesfrombrowser"] = (YTDLP_COOKIES_FROM_BROWSER,)
     return opts
 
