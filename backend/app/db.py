@@ -68,6 +68,12 @@ class Database:
         ).fetchone()
         return dict(row) if row else None
 
+    def get_sentence_text(self, sentence_id: int) -> str | None:
+        row = self.conn.execute(
+            "SELECT text FROM sentences WHERE id = ?", (sentence_id,)
+        ).fetchone()
+        return row["text"] if row else None
+
     def record_attempt(self, sentence_id: int, score: float, status: str) -> int:
         cur = self.conn.execute(
             "INSERT INTO attempts (sentence_id, score, status) VALUES (?, ?, ?)",

@@ -2,7 +2,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -12,6 +12,9 @@ from app.db import Database
 
 app = FastAPI(title="Shadowing")
 db = Database(DB_PATH)
+
+# 一句達到呢個比例先算「過咗」，否則叫使用者再練
+PASS_THRESHOLD = 0.8
 
 
 @app.get("/api/shows")
@@ -47,23 +50,23 @@ def api_create_material(show_id: str):
 
 
 @app.post("/api/attempts")
-async def api_attempt(sentence_id: int = Form(...), audio: UploadFile = Form(...)):
+async def api_attempt(sentence_id: int = Form(...), audio: UploadFile = File(...)):
     suffix = Path(audio.filename or "rec.webm").suffix or ".webm"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         shutil.copyfileobj(audio.file, tmp)
         tmp_path = tmp.name
 
-    spoken = transcribe.transcribe_text(tmp_path)
-    Path(tmp_path).unlink(missing_ok=True)
+    try:
+        spoken = transcribe.transcribe_text(tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
-    row = db.conn.execute(
-        "SELECT text FROM sentences WHERE id = ?", (sentence_id,)
-    ).fetchone()
-    if row is None:
+    ref_text = db.get_sentence_text(sentence_id)
+    if ref_text is None:
         raise HTTPException(404, "sentence not found")
 
-    result = compare.compare_sentence(row["text"], spoken)
-    status = "pass" if result["score"] >= 0.8 else "retry"
+    result = compare.compare_sentence(ref_text, spoken)
+    status = "pass" if result["score"] >= PASS_THRESHOLD else "retry"
     db.record_attempt(sentence_id, result["score"], status)
     return {"spoken": spoken, "tokens": result["tokens"],
             "score": result["score"], "status": status}

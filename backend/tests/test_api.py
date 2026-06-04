@@ -58,3 +58,26 @@ def test_submit_attempt_returns_tokens(tmp_path, monkeypatch):
     body = r.json()
     assert "tokens" in body and "score" in body
     assert any(t["status"] == "wrong" for t in body["tokens"])
+
+
+def test_create_material_unknown_show_404(tmp_path, monkeypatch):
+    client = get_client(tmp_path, monkeypatch)
+    r = client.post("/api/materials", params={"show_id": "not_a_show"})
+    assert r.status_code == 404
+
+
+def test_create_material_empty_segments_422(tmp_path, monkeypatch):
+    client = get_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(main.youtube, "find_clip", lambda q: {
+        "youtube_id": "abc", "title": "clip", "audio_path": "p.m4a"})
+    monkeypatch.setattr(main.transcribe, "transcribe_segments", lambda p: [])
+    r = client.post("/api/materials", params={"show_id": "bojack"})
+    assert r.status_code == 422
+
+
+def test_attempt_missing_sentence_404(tmp_path, monkeypatch):
+    client = get_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(main.transcribe, "transcribe_text", lambda p: "hi")
+    files = {"audio": ("rec.webm", io.BytesIO(b"fake"), "audio/webm")}
+    r = client.post("/api/attempts", data={"sentence_id": "9999"}, files=files)
+    assert r.status_code == 404
