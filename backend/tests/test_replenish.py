@@ -63,6 +63,8 @@ def test_replenish_skips_empty_sentences(tmp_path):
         segment_fn=lambda raw: [], audio_dest_dir=audio_dir,
     )
     assert manifest["shows"] == []
+    # 切唔到句 → 已下載音檔要清走，唔好遺留
+    assert list((tmp_path / "dl").glob("*.m4a")) == []
 
 
 def test_replenish_respects_existing_unplayed(tmp_path):
@@ -102,6 +104,8 @@ def test_replenish_dedupes_repeated_clip_id(tmp_path):
     )
     # 同一 clip_id 只入一次
     assert len(manifest["shows"][0]["clips"]) == 1
+    # 重複 clip_id → 後續下載音檔要清走
+    assert not (dl / "dup.m4a").exists()
 
 
 def test_main_loads_runs_and_saves(monkeypatch, tmp_path):

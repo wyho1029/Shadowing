@@ -35,11 +35,15 @@ def replenish_once(*, manifest, progress, show_ids, show_names, target,
     for show_id, n in needs.items():
         for _ in range(n):
             clip = source_fn(show_id)
-            if not clip or clip["clip_id"] in seen:
+            if not clip:
+                continue
+            if clip["clip_id"] in seen:
+                Path(clip["audio_path"]).unlink(missing_ok=True)  # 重複片：清走已下載音檔
                 continue
             raw = transcribe_fn(clip["audio_path"])
             sentences = segment_fn(raw)
             if not sentences:
+                Path(clip["audio_path"]).unlink(missing_ok=True)  # 切唔到句：清走已下載音檔
                 continue
             audio_file = move_into_library(clip["audio_path"], audio_dest_dir)
             library.add_clip(manifest, show_id, show_names[show_id],
