@@ -40,8 +40,16 @@ def replenish_once(*, manifest, progress, show_ids, show_names, target,
             if clip["clip_id"] in seen:
                 Path(clip["audio_path"]).unlink(missing_ok=True)  # 重複片：清走已下載音檔
                 continue
-            raw = transcribe_fn(clip["audio_path"])
-            sentences = segment_fn(raw)
+            # 下載被 cap / 失敗時 yt-dlp ignoreerrors 會吞錯，留低一個唔存在嘅路徑 → 跳
+            if not Path(clip["audio_path"]).exists():
+                continue
+            try:
+                raw = transcribe_fn(clip["audio_path"])
+                sentences = segment_fn(raw)
+            except Exception:
+                # 個別片轉錄炸唔好殺成個 run（spec §7）：清走、跳去下一條
+                Path(clip["audio_path"]).unlink(missing_ok=True)
+                continue
             if not sentences:
                 Path(clip["audio_path"]).unlink(missing_ok=True)  # 切唔到句：清走已下載音檔
                 continue

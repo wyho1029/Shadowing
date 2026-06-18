@@ -108,6 +108,44 @@ def test_replenish_dedupes_repeated_clip_id(tmp_path):
     assert not (dl / "dup.m4a").exists()
 
 
+def test_replenish_skips_when_audio_file_missing(tmp_path):
+    audio_dir = tmp_path / "la"; audio_dir.mkdir()
+    manifest = library.load_manifest(tmp_path / "m.json")
+    progress = library.load_progress(tmp_path / "p.json")
+
+    def source_missing(show_id):
+        # 模擬下載被 cap：clip 有返，但 audio_path 個檔根本唔存在
+        return {"clip_id": "gone", "source": "youtube",
+                "title": "gone", "audio_path": str(tmp_path / "nope.m4a")}
+
+    replenish.replenish_once(
+        manifest=manifest, progress=progress, show_ids=["bojack"],
+        show_names={"bojack": "BoJack"}, target=2,
+        source_fn=source_missing, transcribe_fn=lambda p: ["raw"],
+        segment_fn=_fake_segment_ok, audio_dest_dir=audio_dir,
+    )
+    assert manifest["shows"] == []   # 冇 crash、冇加片
+
+
+def test_replenish_skips_when_transcribe_raises(tmp_path):
+    audio_dir = tmp_path / "la"; audio_dir.mkdir()
+    manifest = library.load_manifest(tmp_path / "m.json")
+    progress = library.load_progress(tmp_path / "p.json")
+    source_fn = _make_source(tmp_path)
+
+    def boom_transcribe(path):
+        raise RuntimeError("decode failed")
+
+    replenish.replenish_once(
+        manifest=manifest, progress=progress, show_ids=["bojack"],
+        show_names={"bojack": "BoJack"}, target=2,
+        source_fn=source_fn, transcribe_fn=boom_transcribe,
+        segment_fn=_fake_segment_ok, audio_dest_dir=audio_dir,
+    )
+    assert manifest["shows"] == []                       # 冇 crash、冇加片
+    assert list((tmp_path / "dl").glob("*.m4a")) == []   # 失敗音檔已清走
+
+
 def test_main_loads_runs_and_saves(monkeypatch, tmp_path):
     calls = {}
     monkeypatch.setattr(replenish.library, "load_manifest",
