@@ -102,3 +102,23 @@ def test_replenish_dedupes_repeated_clip_id(tmp_path):
     )
     # 同一 clip_id 只入一次
     assert len(manifest["shows"][0]["clips"]) == 1
+
+
+def test_main_loads_runs_and_saves(monkeypatch, tmp_path):
+    calls = {}
+    monkeypatch.setattr(replenish.library, "load_manifest",
+                        lambda p: {"version": 1, "updated_at": None, "shows": []})
+    monkeypatch.setattr(replenish.library, "load_progress",
+                        lambda p: {"version": 1, "done_clips": [], "attempts": []})
+
+    def fake_run(**kw):
+        calls["ran"] = True
+        return kw["manifest"]
+    monkeypatch.setattr(replenish, "replenish_once", fake_run)
+
+    def fake_save(manifest, path):
+        calls["saved"] = True
+    monkeypatch.setattr(replenish.library, "save_manifest", fake_save)
+
+    replenish.main()
+    assert calls.get("ran") and calls.get("saved")
