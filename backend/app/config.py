@@ -24,3 +24,16 @@ YTDLP_COOKIES_FROM_BROWSER = None
 
 DATA_DIR.mkdir(exist_ok=True)
 AUDIO_DIR.mkdir(exist_ok=True)
+
+# ── 新片庫（Plan 1 Replenisher）──────────────────────────────────────────────
+# 磨片廠寫呢度;Drive 桌面版自動 sync 上雲(整個 project 已喺 Drive 同步資料夾)。
+LIBRARY_DIR = DATA_DIR / "library"
+LIBRARY_AUDIO_DIR = LIBRARY_DIR / "audio"
+MANIFEST_PATH = LIBRARY_DIR / "manifest.json"
+PROGRESS_PATH = LIBRARY_DIR / "progress.json"
+
+# 每套劇要保持幾多條「未練」片;低過就補。
+TARGET_UNPLAYED_PER_SHOW = 3
+
+LIBRARY_DIR.mkdir(exist_ok=True)
+LIBRARY_AUDIO_DIR.mkdir(exist_ok=True)
