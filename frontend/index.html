@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Shadowing</title>
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <header><h1>Shadowing</h1></header>
@@ -13,7 +13,6 @@
   <section id="show-picker">
     <h2>揀一套劇</h2>
     <div id="shows" class="shows"></div>
-    <button id="find-btn" disabled>搵片開始練</button>
     <p id="status" class="status"></p>
   </section>
 
@@ -45,12 +44,13 @@
     </div>
   </section>
 
-  <audio id="orig-audio"></audio>
-  <script src="/app.js"></script>
+  <audio id="orig-audio" preload="auto"></audio>
+  <script src="./config.js"></script>
+  <script src="./compare.js"></script>
+  <script src="./practice-core.js"></script>
+  <script src="./app.js"></script>
   <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js");
-    }
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js");
   </script>
 </body>
 </html>

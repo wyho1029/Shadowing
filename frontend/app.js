@@ -1,70 +1,72 @@
-const API = "";  // 同源
-let selectedShow = null;
-let material = null;       // {material_id, youtube_id, title, sentences}
+const API = window.API_BASE;
+let manifest = null;
+let progress = { version: 1, done_clips: [], attempts: [] };
+let current = null;   // {show, clip}
 let idx = 0;
-let mediaRecorder = null;
-let recordedChunks = [];
-let myAudioUrl = null;
+let mediaRecorder = null, recordedChunks = [], myAudioUrl = null;
+let recognition = null, lastSpoken = "";
 
 const $ = (id) => document.getElementById(id);
 
-async function loadShows() {
-  const res = await fetch(`${API}/api/shows`);
-  const shows = await res.json();
-  const wrap = $("shows");
-  wrap.innerHTML = "";
-  shows.forEach((s) => {
-    const b = document.createElement("button");
-    b.textContent = s.name;
-    b.onclick = () => {
-      selectedShow = s.id;
-      [...wrap.children].forEach((c) => c.classList.remove("selected"));
-      b.classList.add("selected");
-      $("find-btn").disabled = false;
-    };
-    wrap.appendChild(b);
-  });
+async function boot() {
+  $("status").textContent = "載入緊片庫…";
+  try {
+    const [m, p] = await Promise.all([
+      fetch(`${API}?action=manifest`).then((r) => r.json()),
+      fetch(`${API}?action=progress`).then((r) => r.json()),
+    ]);
+    manifest = m;
+    progress = p && p.done_clips ? p : progress;
+  } catch (e) {
+    $("status").textContent = "✗ 載入失敗，請檢查網絡或稍後再試。";
+    return;
+  }
+  renderShows();
 }
 
-$("find-btn").onclick = async () => {
-  $("status").textContent = "搵緊片同處理緊…（第一次載 Whisper model 會耐少少）";
-  $("find-btn").disabled = true;
-  try {
-    const res = await fetch(`${API}/api/materials?show_id=${selectedShow}`,
-                            { method: "POST" });
-    if (!res.ok) {
-      const err = await res.json();
-      $("status").textContent = "✗ " + (err.detail || "出錯，試下另一套");
-      $("find-btn").disabled = false;
-      return;
-    }
-    material = await res.json();
-    idx = 0;
-    $("show-picker").hidden = true;
-    $("practice").hidden = false;
-    $("material-title").textContent = material.title;
-    $("orig-audio").src = `${API}/api/audio/${material.youtube_id}`;
-    loadSentence();
-  } catch (e) {
-    $("status").textContent = "✗ 網絡或伺服器出錯：" + e.message;
-    $("find-btn").disabled = false;
+function renderShows() {
+  const wrap = $("shows");
+  wrap.innerHTML = "";
+  (manifest.shows || []).forEach((s) => {
+    const unplayed = s.clips.filter(
+      (c) => progress.done_clips.indexOf(c.clip_id) === -1).length;
+    const b = document.createElement("button");
+    b.textContent = `${s.name}（未練 ${unplayed}）`;
+    b.disabled = unplayed === 0;
+    b.onclick = () => startShow(s.id);
+    wrap.appendChild(b);
+  });
+  if (!(manifest.shows || []).some((s) =>
+      s.clips.some((c) => progress.done_clips.indexOf(c.clip_id) === -1))) {
+    $("status").textContent = "片庫暫時冇未練嘅片，等磨片廠補片。";
   }
-};
+}
+
+function startShow(showId) {
+  current = PracticeCore.pickNextClip(manifest, progress.done_clips, showId);
+  if (!current) { renderShows(); return; }
+  idx = 0;
+  $("show-picker").hidden = true;
+  $("practice").hidden = false;
+  $("material-title").textContent = current.clip.title;
+  $("orig-audio").src = current.clip.audio_url;
+  loadSentence();
+}
 
 function loadSentence() {
-  const s = material.sentences[idx];
+  const s = current.clip.sentences[idx];
   $("ref-text").textContent = s.text;
-  $("progress").textContent = `第 ${idx + 1} / ${material.sentences.length} 句`;
+  $("progress").textContent = `第 ${idx + 1} / ${current.clip.sentences.length} 句`;
   $("result").hidden = true;
   $("play-mine").disabled = true;
 }
 
-// 單一個 timeupdate listener，永遠讀「當前句」嘅 end（唔好每次撳都加新 listener）
+// 單一 timeupdate listener，永遠讀「當前句」的 end
 function bindSegmentStop() {
   const a = $("orig-audio");
   if (a._stopBound) return;
   a.addEventListener("timeupdate", () => {
-    const cur = material && material.sentences[idx];
+    const cur = current && current.clip.sentences[idx];
     if (!cur) return;
     if (a.currentTime >= cur.end) {
       if ($("loop").checked) a.currentTime = cur.start;
@@ -75,69 +77,70 @@ function bindSegmentStop() {
 }
 
 $("play-orig").onclick = () => {
-  const s = material.sentences[idx];
+  const s = current.clip.sentences[idx];
   const a = $("orig-audio");
   a.playbackRate = $("slow").checked ? 0.75 : 1.0;
   bindSegmentStop();
-
-  // 一定要喺用戶手勢同步 call play()，否則會被 autoplay 政策擋（靜靜冇聲）。
-  // seek：metadata 載好就即刻 seek，未好就等 loadedmetadata（避免被夾到 0）。
-  const seekToStart = () => { try { a.currentTime = s.start; } catch (_) {} };
-  if (a.readyState >= 1) seekToStart();
-  else a.addEventListener("loadedmetadata", seekToStart, { once: true });
-
+  const seek = () => { try { a.currentTime = s.start; } catch (_) {} };
+  if (a.readyState >= 1) seek();
+  else a.addEventListener("loadedmetadata", seek, { once: true });
   const p = a.play();
-  if (p && p.catch) {
-    p.catch((err) => {
-      $("status").textContent = "▶ 播放被瀏覽器擋住，請再撳一次：" + err.message;
-    });
-  }
+  if (p && p.catch) p.catch((err) => {
+    $("status").textContent = "▶ 播放被擋，請再撳一次：" + err.message;
+  });
 };
 
+// 錄跟讀：Web Speech API 即時 STT（評分）+ MediaRecorder（聽返自己）
 $("record").onclick = async () => {
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
-    return;
-  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (mediaRecorder && mediaRecorder.state === "recording") { stopRecording(); return; }
+
   let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch {
-    alert("冇咪權限：請喺瀏覽器允許麥克風使用。");
-    return;
-  }
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { alert("冇咪權限：請喺瀏覽器允許麥克風。"); return; }
+
   recordedChunks = [];
   mediaRecorder = new MediaRecorder(stream);
   mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
   mediaRecorder.onstop = () => {
     stream.getTracks().forEach((t) => t.stop());
-    $("record").classList.remove("recording");
     $("record").textContent = "● 錄跟讀";
     const blob = new Blob(recordedChunks, { type: "audio/webm" });
     if (myAudioUrl) URL.revokeObjectURL(myAudioUrl);
     myAudioUrl = URL.createObjectURL(blob);
     $("play-mine").disabled = false;
-    submitAttempt(blob);
   };
   mediaRecorder.start();
-  $("record").classList.add("recording");
   $("record").textContent = "■ 停止";
+
+  lastSpoken = "";
+  if (SR) {
+    recognition = new SR();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.onresult = (e) => {
+      lastSpoken = Array.from(e.results).map((r) => r[0].transcript).join(" ");
+    };
+    recognition.onerror = () => {};
+    recognition.start();
+  }
 };
 
-$("play-mine").onclick = () => {
-  if (myAudioUrl) new Audio(myAudioUrl).play();
-};
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+  if (recognition) { try { recognition.stop(); } catch (_) {} }
+  setTimeout(score, 300);   // 等 onresult 收尾
+}
 
-async function submitAttempt(blob) {
-  const s = material.sentences[idx];
-  const fd = new FormData();
-  fd.append("sentence_id", String(s.id));
-  fd.append("audio", blob, "rec.webm");
-  $("status").textContent = "對比緊…";
-  const res = await fetch(`${API}/api/attempts`, { method: "POST", body: fd });
-  $("status").textContent = "";
-  const body = await res.json();
-  renderResult(body);
+function score() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    $("status").textContent = "（此瀏覽器唔支援語音辨識，淨係可以聽返自己對比。）";
+    return;
+  }
+  const ref = current.clip.sentences[idx].text;
+  const result = Compare.compareSentence(ref, lastSpoken);
+  renderResult(result);
 }
 
 function renderResult(body) {
@@ -153,14 +156,31 @@ function renderResult(body) {
   $("result").hidden = false;
 }
 
-function nextSentence() {
-  if (idx + 1 < material.sentences.length) { idx++; loadSentence(); }
-  else { $("ref-text").textContent = "🎉 呢條片練完！返去揀過套劇。";
-         $("result").hidden = true; }
-}
+$("play-mine").onclick = () => { if (myAudioUrl) new Audio(myAudioUrl).play(); };
 
 $("mark-pass").onclick = nextSentence;
-$("mark-retry").onclick = () => { $("result").hidden = true;
-                                  $("play-mine").disabled = true; };
+$("mark-retry").onclick = () => { $("result").hidden = true; $("play-mine").disabled = true; };
 
-loadShows();
+function nextSentence() {
+  if (idx + 1 < current.clip.sentences.length) { idx++; loadSentence(); return; }
+  // clip 練完：標 done + 回寫 progress
+  PracticeCore.markDone(progress, current.clip.clip_id);
+  postProgress(current.clip.clip_id);
+  $("ref-text").textContent = "🎉 呢條片練完！返去揀過。";
+  $("result").hidden = true;
+  setTimeout(() => {
+    $("practice").hidden = true;
+    $("show-picker").hidden = false;
+    renderShows();
+  }, 1200);
+}
+
+function postProgress(clipId) {
+  fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },  // 避開 CORS preflight
+    body: JSON.stringify({ clip_id: clipId }),
+  }).catch(() => {});   // 失敗唔阻練習；下次 boot 會重攞 progress
+}
+
+boot();
