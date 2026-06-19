@@ -105,6 +105,7 @@ $("record").onclick = async () => {
   mediaRecorder.onstop = () => {
     stream.getTracks().forEach((t) => t.stop());
     $("record").textContent = "● 錄跟讀";
+    $("record").classList.remove("recording");
     const blob = new Blob(recordedChunks, { type: "audio/webm" });
     if (myAudioUrl) URL.revokeObjectURL(myAudioUrl);
     myAudioUrl = URL.createObjectURL(blob);
@@ -112,16 +113,20 @@ $("record").onclick = async () => {
   };
   mediaRecorder.start();
   $("record").textContent = "■ 停止";
+  $("record").classList.add("recording");
 
   lastSpoken = "";
   if (SR) {
     recognition = new SR();
     recognition.lang = "en-US";
     recognition.interimResults = false;
+    recognition.continuous = true;
     recognition.onresult = (e) => {
       lastSpoken = Array.from(e.results).map((r) => r[0].transcript).join(" ");
     };
-    recognition.onerror = () => {};
+    recognition.onerror = (e) => {
+      $("status").textContent = "辨識出錯：" + e.error;
+    };
     recognition.start();
   }
 };

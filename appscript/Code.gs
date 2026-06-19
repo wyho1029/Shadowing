@@ -61,14 +61,18 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  var folder = _folder();
-  var body = JSON.parse(e.postData.contents);   // {clip_id, attempt?}
-  var progress = _readJson(folder, "progress.json",
-    { version: 1, done_clips: [], attempts: [] });
-  if (body.clip_id && progress.done_clips.indexOf(body.clip_id) === -1) {
-    progress.done_clips.push(body.clip_id);
+  try {
+    var folder = _folder();
+    var body = JSON.parse(e.postData.contents);   // {clip_id, attempt?}
+    var progress = _readJson(folder, "progress.json",
+      { version: 1, done_clips: [], attempts: [] });
+    if (body.clip_id && progress.done_clips.indexOf(body.clip_id) === -1) {
+      progress.done_clips.push(body.clip_id);
+    }
+    if (body.attempt) progress.attempts.push(body.attempt);
+    _writeJson(folder, "progress.json", progress);
+    return _json({ ok: true, done_clips: progress.done_clips.length });
+  } catch (err) {
+    return _json({ ok: false, error: String(err) });
   }
-  if (body.attempt) progress.attempts.push(body.attempt);
-  _writeJson(folder, "progress.json", progress);
-  return _json({ ok: true, done_clips: progress.done_clips.length });
 }
