@@ -49,7 +49,7 @@ function startShow(showId) {
   $("show-picker").hidden = true;
   $("practice").hidden = false;
   $("material-title").textContent = current.clip.title;
-  $("orig-audio").src = current.clip.audio_url;
+  $("orig-audio").src = "./audio/" + current.clip.audio_file;  // 同源（GitHub Pages），Drive link 喺瀏覽器播唔到
   loadSentence();
 }
 
