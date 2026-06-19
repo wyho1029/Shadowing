@@ -4,7 +4,7 @@ let progress = { version: 1, done_clips: [], attempts: [] };
 let current = null;   // {show, clip}
 let idx = 0;
 let mediaRecorder = null, recordedChunks = [], myAudioUrl = null;
-let recognition = null, lastSpoken = "";
+let recognition = null, lastSpoken = "", listening = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -93,49 +93,38 @@ $("play-orig").onclick = () => {
 // 錄跟讀：Web Speech API 即時 STT（評分）+ MediaRecorder（聽返自己）
 $("record").onclick = async () => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (mediaRecorder && mediaRecorder.state === "recording") { stopRecording(); return; }
+  if (!SR) {
+    $("status").textContent = "呢個瀏覽器唔支援語音辨識，請用 Chrome。";
+    return;
+  }
+  if (listening) {                 // 第二下撳 = 停止辨識
+    try { recognition.stop(); } catch (_) {}
+    return;
+  }
 
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { alert("冇咪權限：請喺瀏覽器允許麥克風。"); return; }
-
-  recordedChunks = [];
-  mediaRecorder = new MediaRecorder(stream);
-  mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
-  mediaRecorder.onstop = () => {
-    stream.getTracks().forEach((t) => t.stop());
+  // 評分淨用 Web Speech（唔同時開 MediaRecorder，避免 Android 上爭麥克風 → 收唔到聲 → 0%）
+  lastSpoken = "";
+  recognition = new SR();
+  recognition.lang = "en-US";
+  recognition.interimResults = true;   // 即時顯示，亦方便睇到有冇收到聲
+  recognition.continuous = true;
+  recognition.onresult = (e) => {
+    lastSpoken = Array.from(e.results).map((r) => r[0].transcript).join(" ").trim();
+    $("status").textContent = "聽到：" + lastSpoken;
+  };
+  recognition.onerror = (e) => { $("status").textContent = "辨識出錯：" + e.error; };
+  recognition.onend = () => {
+    listening = false;
     $("record").textContent = "● 錄跟讀";
     $("record").classList.remove("recording");
-    const blob = new Blob(recordedChunks, { type: "audio/webm" });
-    if (myAudioUrl) URL.revokeObjectURL(myAudioUrl);
-    myAudioUrl = URL.createObjectURL(blob);
-    $("play-mine").disabled = false;
+    score();
   };
-  mediaRecorder.start();
+  recognition.start();
+  listening = true;
   $("record").textContent = "■ 停止";
   $("record").classList.add("recording");
-
-  lastSpoken = "";
-  if (SR) {
-    recognition = new SR();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.continuous = true;
-    recognition.onresult = (e) => {
-      lastSpoken = Array.from(e.results).map((r) => r[0].transcript).join(" ");
-    };
-    recognition.onerror = (e) => {
-      $("status").textContent = "辨識出錯：" + e.error;
-    };
-    recognition.start();
-  }
+  $("status").textContent = "聽緊…請讀出嗰句";
 };
-
-function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-  if (recognition) { try { recognition.stop(); } catch (_) {} }
-  setTimeout(score, 300);   // 等 onresult 收尾
-}
 
 function score() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
