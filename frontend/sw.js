@@ -1,6 +1,6 @@
 // 相對路徑 shell（GitHub Pages 子路徑）；network-first 取最新，離線用 cache。
 // 音檔（Drive 跨 origin）以 cache-first 存起，令離線可重播近期 clip。
-const CACHE = "shadowing-v3";
+const CACHE = "shadowing-v4";
 const SHELL = ["./", "./index.html", "./app.js", "./compare.js",
                "./practice-core.js", "./config.js", "./style.css",
                "./manifest.webmanifest"];
@@ -20,6 +20,8 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
+  // 音檔：完全唔攔截，交畀瀏覽器原生處理（range/seek、串流）—— SW 攔截會拖慢媒體
+  if (url.pathname.indexOf("/audio/") !== -1) return;
   // Drive 音檔：cache-first（離線可重播）
   if (url.hostname.indexOf("drive.google.com") !== -1 ||
       url.hostname.indexOf("googleusercontent.com") !== -1) {
