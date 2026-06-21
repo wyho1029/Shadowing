@@ -4,7 +4,8 @@ let progress = { version: 1, done_clips: [], attempts: [] };
 let current = null;   // {show, clip}
 let idx = 0;
 let mediaRecorder = null, recordedChunks = [], myAudioUrl = null;
-let recognition = null, lastSpoken = "", listening = false;
+let recognition = null, lastSpoken = "", listening = false,
+    finalTranscript = "", userStopped = false, lastError = "";
 
 const $ = (id) => document.getElementById(id);
 
@@ -91,41 +92,64 @@ $("play-orig").onclick = () => {
   });
 };
 
-// 錄跟讀：Web Speech API 即時 STT（評分）+ MediaRecorder（聽返自己）
-$("record").onclick = async () => {
+// 錄跟讀：Web Speech API 即時 STT（評分）。撳一下開始，再撳一下先停（唔會自己停）。
+$("record").onclick = () => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
     $("status").textContent = "呢個瀏覽器唔支援語音辨識，請用 Chrome。";
     return;
   }
-  if (listening) {                 // 第二下撳 = 停止辨識
+  if (listening) {                 // 第二下撳 = 用戶主動停 → 評分
+    userStopped = true;
     try { recognition.stop(); } catch (_) {}
     return;
   }
-
-  // 評分淨用 Web Speech（唔同時開 MediaRecorder，避免 Android 上爭麥克風 → 收唔到聲 → 0%）
+  finalTranscript = "";
   lastSpoken = "";
-  recognition = new SR();
-  recognition.lang = "en-US";
-  recognition.interimResults = true;   // 即時顯示，亦方便睇到有冇收到聲
-  recognition.continuous = true;
-  recognition.onresult = (e) => {
-    lastSpoken = Array.from(e.results).map((r) => r[0].transcript).join(" ").trim();
-    $("status").textContent = "聽到：" + lastSpoken;
-  };
-  recognition.onerror = (e) => { $("status").textContent = "辨識出錯：" + e.error; };
-  recognition.onend = () => {
-    listening = false;
-    $("record").textContent = "● 錄跟讀";
-    $("record").classList.remove("recording");
-    score();
-  };
-  recognition.start();
+  userStopped = false;
+  lastError = "";
   listening = true;
   $("record").textContent = "■ 停止";
   $("record").classList.add("recording");
-  $("status").textContent = "聽緊…請讀出嗰句";
+  $("status").textContent = "聽緊…請讀出嗰句，讀完撳「停止」";
+  runRecognition(SR);
 };
+
+function runRecognition(SR) {
+  recognition = new SR();
+  recognition.lang = "en-US";
+  recognition.interimResults = true;
+  recognition.continuous = true;
+  recognition.onresult = (e) => {
+    // 只將「final」結果累加；interim 只係即時顯示 → 唔會重複爆字
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) finalTranscript += r[0].transcript + " ";
+      else interim += r[0].transcript;
+    }
+    lastSpoken = finalTranscript.trim();
+    $("status").textContent = "聽到：" + (finalTranscript + interim).trim();
+  };
+  recognition.onerror = (e) => {
+    lastError = e.error;
+    if (e.error !== "no-speech" && e.error !== "aborted")
+      $("status").textContent = "辨識出錯：" + e.error;
+  };
+  recognition.onend = () => {
+    const fatal = lastError === "not-allowed" || lastError === "service-not-allowed" ||
+                  lastError === "network";
+    if (userStopped || fatal) {     // 用戶撳停（或致命錯誤）→ 收掣 + 評分
+      listening = false;
+      $("record").textContent = "● 錄跟讀";
+      $("record").classList.remove("recording");
+      if (userStopped) score();
+      return;
+    }
+    runRecognition(SR);             // 自動續期：唔好自己停，等用戶撳停先算
+  };
+  recognition.start();
+}
 
 function score() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
