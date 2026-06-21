@@ -45,7 +45,8 @@ function renderShows() {
 function startShow(showId) {
   current = PracticeCore.pickNextClip(manifest, progress.done_clips, showId);
   if (!current) { renderShows(); return; }
-  idx = 0;
+  const savedIdx = loadSentProgress()[current.clip.clip_id] || 0;
+  idx = Math.min(savedIdx, current.clip.sentences.length - 1);   // resume 到上次嗰句
   $("show-picker").hidden = true;
   $("practice").hidden = false;
   $("material-title").textContent = current.clip.title;
@@ -156,17 +157,20 @@ $("mark-pass").onclick = nextSentence;
 $("mark-retry").onclick = () => { $("result").hidden = true; $("play-mine").disabled = true; };
 
 function nextSentence() {
-  if (idx + 1 < current.clip.sentences.length) { idx++; loadSentence(); return; }
-  // clip 練完：標 done + 回寫 progress
-  PracticeCore.markDone(progress, current.clip.clip_id);
-  postProgress(current.clip.clip_id);
+  const clipId = current.clip.clip_id;
+  if (idx + 1 < current.clip.sentences.length) {
+    idx++;
+    saveSentProgress(clipId, idx);            // 記返 resume 點（同機 localStorage）
+    loadSentence();
+    return;
+  }
+  // clip 練完：標 done（Drive）+ 記晒
+  PracticeCore.markDone(progress, clipId);
+  saveSentProgress(clipId, current.clip.sentences.length);
+  postProgress(clipId);
   $("ref-text").textContent = "🎉 呢條片練完！返去揀過。";
   $("result").hidden = true;
-  setTimeout(() => {
-    $("practice").hidden = true;
-    $("show-picker").hidden = false;
-    renderShows();
-  }, 1200);
+  setTimeout(goHome, 1200);
 }
 
 function postProgress(clipId) {
@@ -176,5 +180,24 @@ function postProgress(clipId) {
     body: JSON.stringify({ clip_id: clipId }),
   }).catch(() => {});   // 失敗唔阻練習；下次 boot 會重攞 progress
 }
+
+// ── 句子進度（localStorage，同機 resume）+ 返主頁 ───────────────────────────
+const SENT_KEY = "shadowing_sentence_progress";
+function loadSentProgress() {
+  try { return JSON.parse(localStorage.getItem(SENT_KEY)) || {}; } catch (_) { return {}; }
+}
+function saveSentProgress(clipId, nextIdx) {
+  const p = loadSentProgress();
+  p[clipId] = nextIdx;
+  try { localStorage.setItem(SENT_KEY, JSON.stringify(p)); } catch (_) {}
+}
+
+function goHome() {
+  try { $("orig-audio").pause(); } catch (_) {}
+  $("practice").hidden = true;
+  $("show-picker").hidden = false;
+  renderShows();
+}
+$("home-btn").onclick = goHome;
 
 boot();
